@@ -101,23 +101,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     }
   }, [navigate]);
 
-  const handleContinueWithGoogleClick = () => {
-    if (window.google?.accounts?.id) {
-      const btn = googleBtnRef.current?.querySelector('div[role="button"], iframe') as HTMLElement;
-      if (btn) {
-        btn.click();
-      }
-      window.google.accounts.id.prompt((notification: any) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          const innerBtn = googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement;
-          if (innerBtn) innerBtn.click();
-        }
-      });
-    } else {
-      setErrors({ email: 'Google Sign-In is initializing... Please try clicking again.' });
-    }
-  };
-
   const handleChange = (field: 'email' | 'password' | 'confirmPassword' | 'name', value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: '' }));
@@ -212,25 +195,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           {pageTitle}
         </h1>
 
-        <button
-          type="button"
-          onClick={handleContinueWithGoogleClick}
-          className="w-full h-[44px] flex items-center justify-center gap-3 rounded-[6px] border border-[#cde0d7] bg-[#dfeee7] text-[#1d3b2d] font-medium text-sm md:text-[0.95rem] transition hover:bg-[#d1e6db] focus:outline-none focus:ring-2 focus:ring-[#b9d6c4]"
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-            <path
-              fill="#EA4335"
-              d="M12 10.2v3.9h5.5c-.2 1.3-1.6 3.9-5.5 3.9-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.8 3.1 14.7 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.8 0 9.6-4.1 9.6-9.8 0-.7-.1-1.2-.2-1.7H12z"
-            />
-            <path fill="#34A853" d="M3.7 7.4l3.4 2.5c.9-1.8 3-3.1 5-3.1 1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.8 3.1 14.7 2 12 2 8.2 2 5.1 4.2 3.7 7.4z" />
-            <path fill="#FBBC05" d="M3.7 16.6A10 10 0 0 1 3 12c0-.7.1-1.4.3-2.1l3.6 2.7c-.2.6-.3 1.2-.3 1.9 0 2.5 1.9 4.1 4.4 4.1 1.3 0 2.4-.5 3.2-1.3l3 2.9c-1.7 1.6-4.2 2.6-7.1 2.6-5.2 0-9.7-4.1-9.7-9.1z" />
-            <path fill="#4285F4" d="M12 22c2.4 0 4.5-.8 6-2.2l-3-2.8c-.8.6-1.8.9-3 .9-2.9 0-5.4-2-6-4.7l-3.4 2.6A10 10 0 0 0 12 22z" />
-          </svg>
-          Continue with Google
-        </button>
-
-        {/* Hidden GIS rendered button container */}
-        <div ref={googleBtnRef} className="hidden" />
+        {/* Official Google Identity Services Rendered Button Container */}
+        <div className="w-full flex justify-center mb-4 min-h-[44px]">
+          <div ref={googleBtnRef} className="w-full flex justify-center" />
+        </div>
 
         <div className="my-5 flex items-center gap-3 text-[#666] text-[0.74rem] uppercase tracking-[0.08em]">
           <span className="h-px flex-1 bg-[#cfcfcf]" />
