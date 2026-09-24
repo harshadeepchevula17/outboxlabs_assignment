@@ -1,7 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { api } from '../lib/axios';
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
 
 type AuthMode = 'login' | 'register';
 
@@ -14,6 +20,8 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
   const isLogin = mode === 'login';
   const navigate = useNavigate();
+  const googleBtnRef = useRef<HTMLDivElement | null>(null);
+
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -28,6 +36,87 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
   const pageTitle = useMemo(() => (isLogin ? 'Login' : 'Register'), [isLogin]);
   const alternatePath = isLogin ? '/register' : '/login';
   const alternateLabel = isLogin ? 'Register' : 'Login';
+
+  const handleGoogleCredentialResponse = async (response: any) => {
+    if (!response?.credential) return;
+
+    try {
+      const res = await api.post('/auth/google', { idToken: response.credential });
+      const token = res.data?.data?.token;
+
+      if (token) {
+        localStorage.setItem('outboxlabs_token', token);
+      } else {
+        localStorage.removeItem('outboxlabs_token');
+      }
+
+      setToast('Google authentication successful. Redirecting to dashboard...');
+      window.setTimeout(() => {
+        navigate('/dashboard');
+      }, 500);
+    } catch (error: any) {
+      localStorage.removeItem('outboxlabs_token');
+      const message = error?.response?.data?.error?.message || 'Google login failed';
+      setErrors({ email: message });
+    }
+  };
+
+  useEffect(() => {
+    const clientId =
+      import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+      '718515370362-hhalfccp919bonqi9dv8avn7natuu95j.apps.googleusercontent.com';
+
+    const initGsi = () => {
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredentialResponse,
+        });
+
+        if (googleBtnRef.current) {
+          window.google.accounts.id.renderButton(googleBtnRef.current, {
+            theme: 'outline',
+            size: 'large',
+            width: '380',
+            text: 'continue_with',
+            shape: 'rectangular',
+          });
+        }
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      initGsi();
+    } else {
+      const existingScript = document.getElementById('gsi-script');
+      if (!existingScript) {
+        const script = document.createElement('script');
+        script.id = 'gsi-script';
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = initGsi;
+        document.body.appendChild(script);
+      }
+    }
+  }, [navigate]);
+
+  const handleContinueWithGoogleClick = () => {
+    if (window.google?.accounts?.id) {
+      const btn = googleBtnRef.current?.querySelector('div[role="button"], iframe') as HTMLElement;
+      if (btn) {
+        btn.click();
+      }
+      window.google.accounts.id.prompt((notification: any) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          const innerBtn = googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement;
+          if (innerBtn) innerBtn.click();
+        }
+      });
+    } else {
+      setErrors({ email: 'Google Sign-In is initializing... Please try clicking again.' });
+    }
+  };
 
   const handleChange = (field: 'email' | 'password' | 'confirmPassword' | 'name', value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -125,6 +214,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
 
         <button
           type="button"
+          onClick={handleContinueWithGoogleClick}
           className="w-full h-[44px] flex items-center justify-center gap-3 rounded-[6px] border border-[#cde0d7] bg-[#dfeee7] text-[#1d3b2d] font-medium text-sm md:text-[0.95rem] transition hover:bg-[#d1e6db] focus:outline-none focus:ring-2 focus:ring-[#b9d6c4]"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
@@ -138,6 +228,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           </svg>
           Continue with Google
         </button>
+
+        {/* Hidden GIS rendered button container */}
+        <div ref={googleBtnRef} className="hidden" />
 
         <div className="my-5 flex items-center gap-3 text-[#666] text-[0.74rem] uppercase tracking-[0.08em]">
           <span className="h-px flex-1 bg-[#cfcfcf]" />

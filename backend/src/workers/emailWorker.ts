@@ -48,18 +48,25 @@ export const processEmailJob = async (job: Job<EmailJobData>): Promise<void> => 
     }
   }
 
+  // Extract custom delay, hourly limit, and attachments from initial SCHEDULED email event metadata
+  const scheduledEvent = email.events?.find((e: any) => e.event === 'SCHEDULED');
+  const metadata = (scheduledEvent?.metadata as any) || {};
+  const customDelayMs = metadata.delaySec ? metadata.delaySec * 1000 : undefined;
+  const customHourlyLimit = metadata.hourlyLimit || undefined;
+  const attachments = metadata.attachments || [];
+
   // 4. Distributed Throttling Check (Minimum delay between emails per sender)
-  const waitMs = await RateLimiterService.reserveThrottleSlot(email.senderId);
+  const waitMs = await RateLimiterService.reserveThrottleSlot(email.senderId, customDelayMs);
   if (waitMs > 0) {
     logger.info(
       { emailId, senderId: email.senderId, waitMs },
-      'Throttling email send to respect MIN_DELAY_BETWEEN_EMAILS_MS'
+      'Throttling email send to respect delay between emails'
     );
     await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
 
   // 5. Hourly Rate Limit Check
-  const rateCheck = await RateLimiterService.checkAndIncrementHourlyLimit(email.senderId);
+  const rateCheck = await RateLimiterService.checkAndIncrementHourlyLimit(email.senderId, customHourlyLimit);
   if (!rateCheck.allowed) {
     logger.warn(
       {
@@ -108,6 +115,7 @@ export const processEmailJob = async (job: Job<EmailJobData>): Promise<void> => 
       toEmail: email.toEmail,
       subject: email.subject,
       body: email.body,
+      attachments,
     });
 
     // 8. Mark as SENT in DB

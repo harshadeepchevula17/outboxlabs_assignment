@@ -12,6 +12,13 @@ export interface ScheduleEmailPayload {
   subject: string;
   body: string;
   scheduledAt: string;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    contentType?: string;
+  }>;
+  delaySec?: number;
+  hourlyLimit?: number;
 }
 
 export interface CreateSenderPayload {
@@ -73,3 +80,9 @@ export const fetchDashboardStats = async (): Promise<DashboardStats> => {
   const { data } = await api.get('/dashboard/stats');
   return data.data;
 };
+
+export const fetchCurrentUser = async () => {
+  const { data } = await api.get('/me');
+  return data.data;
+};
+

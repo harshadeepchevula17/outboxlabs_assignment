@@ -58,8 +58,8 @@ export const errorHandler = (
     success: false,
     error: {
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'An unexpected internal server error occurred',
-      ...(isDev ? { debugMessage: err?.message } : {}),
+      message: err?.message || 'An unexpected internal server error occurred',
+      ...(isDev ? { debugMessage: err?.message, stack: err?.stack, details: err } : {}),
     },
   });
 };

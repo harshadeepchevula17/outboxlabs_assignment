@@ -1,80 +1,126 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Send,
-  Users,
-  Terminal,
-  Zap,
-} from 'lucide-react';
-
-const navigation = [
-  { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
-  { name: 'Scheduled', to: '/scheduled', icon: Clock },
-  { name: 'Sent', to: '/sent', icon: CheckCircle2 },
-  { name: 'Failed', to: '/failed', icon: AlertTriangle },
-  { name: 'Compose Email', to: '/compose', icon: Send },
-  { name: 'Sender Accounts', to: '/senders', icon: Users },
-];
+import { NavLink, useNavigate } from 'react-router-dom';
+import { Clock, Send, ChevronDown } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchCurrentUser, fetchDashboardStats } from '../../services/api';
+import profileAvatar from '../../assets/profile_avatar.svg';
 
 export const Sidebar: React.FC = () => {
+  const navigate = useNavigate();
+  const { data: currentUser } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: fetchCurrentUser,
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: fetchDashboardStats,
+  });
+
+  const handleLogout = () => {
+    localStorage.removeItem('outboxlabs_token');
+    navigate('/login');
+  };
+
+  const userName = currentUser?.name || 'Oliver Brown';
+  const userEmail = currentUser?.email || 'oliver.brown@domain.io';
+
   return (
-    <aside className="w-64 border-r border-slate-800 bg-[#0E131F]/90 flex flex-col justify-between shrink-0 h-screen sticky top-0">
-      <div>
-        {/* Brand Header */}
-        <div className="h-16 flex items-center px-6 border-b border-slate-800 gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold shadow-lg shadow-blue-500/10">
-            <Zap className="w-5 h-5 text-blue-400" />
-          </div>
-          <div>
-            <h1 className="font-bold text-slate-100 text-base tracking-tight leading-none">
-              OutboxLabs
-            </h1>
-            <span className="text-[10px] font-mono text-blue-400 uppercase tracking-widest">
-              Queue Engine v1.0
-            </span>
-          </div>
+    <aside className="w-[250px] bg-white border-r border-transparent flex flex-col justify-between shrink-0 h-screen sticky top-0 p-6 select-none">
+      <div className="space-y-6">
+        {/* ONG Brand Logo */}
+        <div className="pt-1 px-1">
+          <span className="font-logo font-extrabold text-[2.2rem] tracking-[-0.05em] text-[#000000] leading-none block">
+            ONG
+          </span>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="p-4 space-y-1">
-          {navigation.map((item) => (
+        {/* User Card Pill */}
+        <div
+          onClick={handleLogout}
+          title="Click to logout"
+          className="bg-[#f2f4f3] hover:bg-[#e8ebe9] rounded-[16px] px-3.5 py-3 flex items-center justify-between cursor-pointer transition-colors"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-slate-200">
+              <img
+                src={currentUser?.avatarUrl || profileAvatar}
+                alt="Profile Avatar"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = profileAvatar;
+                }}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-[0.85rem] font-bold text-[#2d3748] truncate leading-snug">
+                {userName}
+              </h4>
+              <p className="text-[0.72rem] text-[#8fa099] truncate leading-none mt-0.5">
+                {userEmail}
+              </p>
+            </div>
+          </div>
+          <ChevronDown className="w-4 h-4 text-[#a0aec0] shrink-0 ml-1" />
+        </div>
+
+        {/* Compose Pill Button */}
+        <NavLink
+          to="/compose"
+          className="w-full h-[44px] rounded-full border-2 border-[#20c997] bg-white text-[#20c997] hover:bg-[#20c997] hover:text-white font-bold text-[0.92rem] flex items-center justify-center transition-all duration-150"
+        >
+          Compose
+        </NavLink>
+
+        {/* CORE Navigation Menu */}
+        <div className="space-y-3 pt-2">
+          <div className="text-[0.68rem] font-bold tracking-[0.08em] text-[#a0aec0] uppercase px-2">
+            CORE
+          </div>
+
+          <nav className="space-y-1.5">
             <NavLink
-              key={item.name}
-              to={item.to}
+              to="/dashboard"
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                `flex items-center justify-between px-3.5 py-2.5 rounded-[14px] text-[0.92rem] font-bold transition-all ${
                   isActive
-                    ? 'bg-blue-600/15 text-blue-400 border border-blue-500/25 font-semibold shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                    ? 'bg-[#e6f7f2] text-[#1a202c]'
+                    : 'text-[#4a5568] hover:bg-[#f7fafc]'
                 }`
               }
             >
-              <item.icon className="w-4 h-4 shrink-0" />
-              <span>{item.name}</span>
+              <div className="flex items-center gap-3">
+                <Clock className="w-[18px] h-[18px] text-[#2d3748]" />
+                <span>Scheduled</span>
+              </div>
+              <span className="text-[0.82rem] font-semibold text-[#718096]">
+                {stats?.scheduled || 12}
+              </span>
             </NavLink>
-          ))}
-        </nav>
-      </div>
 
-      {/* Footer System Status Badge */}
-      <div className="p-4 border-t border-slate-800/80">
-        <div className="glass-panel p-3 rounded-lg flex items-center gap-3">
-          <div className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-          </div>
-          <div className="text-xs">
-            <div className="font-medium text-slate-200 flex items-center gap-1.5">
-              <span>BullMQ + Redis Active</span>
-            </div>
-            <p className="text-[11px] text-slate-400 font-mono">10 Workers Active</p>
-          </div>
+            <NavLink
+              to="/sent"
+              className={({ isActive }) =>
+                `flex items-center justify-between px-3.5 py-2.5 rounded-[14px] text-[0.92rem] font-medium transition-all ${
+                  isActive
+                    ? 'bg-[#e6f7f2] text-[#1a202c] font-bold'
+                    : 'text-[#4a5568] hover:bg-[#f7fafc]'
+                }`
+              }
+            >
+              <div className="flex items-center gap-3">
+                <Send className="w-[18px] h-[18px] text-[#718096]" />
+                <span>Sent</span>
+              </div>
+              <span className="text-[0.82rem] font-normal text-[#a0aec0]">
+                {stats?.sent || 785}
+              </span>
+            </NavLink>
+          </nav>
         </div>
       </div>
     </aside>
   );
 };
+
+

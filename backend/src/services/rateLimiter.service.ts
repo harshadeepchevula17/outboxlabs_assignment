@@ -37,8 +37,11 @@ export class RateLimiterService {
   /**
    * Atomically checks and increments hourly email counter for sender.
    */
-  static async checkAndIncrementHourlyLimit(senderId: string): Promise<RateLimitCheckResult> {
-    const maxLimit = config.MAX_EMAILS_PER_HOUR_PER_SENDER;
+  static async checkAndIncrementHourlyLimit(
+    senderId: string,
+    customMaxLimit?: number
+  ): Promise<RateLimitCheckResult> {
+    const maxLimit = (customMaxLimit && customMaxLimit > 0) ? customMaxLimit : config.MAX_EMAILS_PER_HOUR_PER_SENDER;
     const now = new Date();
     const { key, hourWindow } = this.getHourWindowKey(senderId, now);
     const nextWindowStart = this.getNextHourStart(now);
@@ -102,8 +105,10 @@ export class RateLimiterService {
    * Distributed Throttling: Enforces MIN_DELAY_BETWEEN_EMAILS_MS per sender.
    * Atomically reserves a timestamp slot and returns delay needed in ms.
    */
-  static async reserveThrottleSlot(senderId: string): Promise<number> {
-    const minDelayMs = config.MIN_DELAY_BETWEEN_EMAILS_MS;
+  static async reserveThrottleSlot(senderId: string, customDelayMs?: number): Promise<number> {
+    const minDelayMs = (customDelayMs !== undefined && customDelayMs > 0)
+      ? customDelayMs
+      : config.MIN_DELAY_BETWEEN_EMAILS_MS;
     if (minDelayMs <= 0) return 0;
 
     const key = `email-throttle:${senderId}`;

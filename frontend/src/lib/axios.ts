@@ -12,12 +12,9 @@ api.interceptors.request.use((config) => {
   const currentToken = localStorage.getItem('outboxlabs_token');
 
   if (!isAuthRoute && currentToken) {
-    config.headers = {
-      ...config.headers,
-      Authorization: `Bearer ${currentToken}`,
-    };
+    config.headers.set('Authorization', `Bearer ${currentToken}`);
   } else if (config.headers) {
-    delete (config.headers as any).Authorization;
+    config.headers.delete('Authorization');
   }
 
   return config;

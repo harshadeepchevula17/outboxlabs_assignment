@@ -55,15 +55,27 @@ export class SmtpService {
     toEmail: string;
     subject: string;
     body: string;
+    attachments?: Array<{
+      filename: string;
+      content: string; // base64 string or buffer
+      contentType?: string;
+    }>;
   }) {
     const transporter = this.createTransporter(params.smtpConfig);
+
+    const isHtml = /<[a-z][\s\S]*>/i.test(params.body);
 
     const info = await transporter.sendMail({
       from: `"${params.fromName}" <${params.fromEmail}>`,
       to: params.toEmail,
       subject: params.subject,
-      text: params.body,
-      html: params.body.replace(/\n/g, '<br/>'),
+      text: isHtml ? params.body.replace(/<[^>]+>/g, '') : params.body,
+      html: isHtml ? params.body : params.body.replace(/\n/g, '<br/>'),
+      attachments: params.attachments?.map((att) => ({
+        filename: att.filename,
+        content: Buffer.from(att.content, 'base64'),
+        contentType: att.contentType,
+      })),
     });
 
     const previewUrl = nodemailer.getTestMessageUrl(info);

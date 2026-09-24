@@ -38,6 +38,9 @@ export class EmailService {
       subject: input.subject,
       body: input.body,
       scheduledAt,
+      attachments: input.attachments,
+      delaySec: input.delaySec,
+      hourlyLimit: input.hourlyLimit,
     });
 
     // 4. Enqueue BullMQ delayed job

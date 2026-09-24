@@ -10,6 +10,9 @@ export class EmailRepository {
     subject: string;
     body: string;
     scheduledAt: Date;
+    attachments?: Array<{ filename: string; content: string; contentType?: string }>;
+    delaySec?: number;
+    hourlyLimit?: number;
   }) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const email = await tx.email.create({
@@ -28,7 +31,12 @@ export class EmailRepository {
         data: {
           emailId: email.id,
           event: EmailEventType.SCHEDULED,
-          metadata: { scheduledAt: data.scheduledAt.toISOString() },
+          metadata: {
+            scheduledAt: data.scheduledAt.toISOString(),
+            attachments: data.attachments || [],
+            delaySec: data.delaySec,
+            hourlyLimit: data.hourlyLimit,
+          },
         },
       });
 

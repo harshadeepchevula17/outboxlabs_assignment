@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchEmails, cancelEmail, fetchSenders } from '../services/api';
-import { StatusBadge } from '../components/common/StatusBadge';
 import { Pagination } from '../components/common/Pagination';
-import { SkeletonRow } from '../components/common/Skeleton';
-import { Link } from 'react-router-dom';
-import { Search, Filter, Clock, XCircle, Eye, AlertCircle } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Filter, Clock, Star, AlertCircle, XCircle } from 'lucide-react';
+import { format } from 'date-fns';
 
 export const ScheduledEmails: React.FC = () => {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const search = searchParams.get('q') || '';
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
   const [senderId, setSenderId] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -46,156 +46,144 @@ export const ScheduledEmails: React.FC = () => {
   });
 
   const handleCancel = (id: string) => {
-    if (confirm('Are you sure you want to cancel this scheduled email? The delayed job will be removed from BullMQ.')) {
+    if (confirm('Are you sure you want to cancel this scheduled email?')) {
       cancelMutation.mutate(id);
     }
   };
 
+  const [pinnedIds, setPinnedIds] = React.useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('outboxlabs_pinned_emails') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const togglePin = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPinnedIds((prev) => {
+      const updated = prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id];
+      localStorage.setItem('outboxlabs_pinned_emails', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const rawEmails = result?.data || [];
+  const sortedEmails = [...rawEmails].sort((a, b) => {
+    const aPinned = pinnedIds.includes(a.id);
+    const bPinned = pinnedIds.includes(b.id);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+    return 0;
+  });
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 font-sans select-none">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-emerald-500/40 text-emerald-400 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce">
-          <Clock className="w-5 h-5 text-emerald-400" />
-          <span className="text-sm font-medium">{toastMessage}</span>
+        <div className="fixed bottom-6 right-6 z-50 bg-[#2d3748] border border-[#20c997] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+          <Clock className="w-5 h-5 text-[#20c997]" />
+          <span className="text-xs font-medium">{toastMessage}</span>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Clock className="w-5 h-5 text-amber-400" />
-            <span>Scheduled Emails</span>
-          </h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            Emails queued in BullMQ awaiting scheduled execution time.
+      {/* Email Row List */}
+      {isLoading ? (
+        <div className="space-y-3 py-4">
+          <div className="h-10 bg-[#f7fafc] rounded-lg animate-pulse"></div>
+          <div className="h-10 bg-[#f7fafc] rounded-lg animate-pulse"></div>
+        </div>
+      ) : isError ? (
+        <div className="p-12 text-center text-rose-500 text-xs">
+          <AlertCircle className="w-6 h-6 mx-auto mb-2" />
+          Failed to load scheduled emails.
+        </div>
+      ) : sortedEmails.length === 0 ? (
+        <div className="py-20 text-center text-[#a0aec0]">
+          <Clock className="w-10 h-10 mx-auto text-[#cbd5e0] mb-2" />
+          <p className="text-sm font-semibold text-[#4a5568]">No scheduled emails found.</p>
+          <p className="text-xs text-[#a0aec0] mt-1">
+            Schedule a new email from the <Link to="/compose" className="text-[#20c997] underline font-bold">Compose</Link> page.
           </p>
         </div>
+      ) : (
+        <div className="divide-y divide-[#f0f2f1]">
+          {sortedEmails.map((email) => {
+            const isPinned = pinnedIds.includes(email.id);
+            const dateObj = new Date(email.scheduledAt);
+            const badgeText = format(dateObj, 'eee h:mm:ss a');
+            const recipientName = email.toEmail.includes('@')
+              ? email.toEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+              : email.toEmail;
 
-        {/* Filter / Search Bar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search recipient or subject..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 w-64"
-            />
-          </div>
+            return (
+              <div
+                key={email.id}
+                className={`py-3 px-2 flex items-center justify-between hover:bg-[#f8faf9] rounded-xl transition-colors group cursor-pointer ${
+                  isPinned ? 'bg-[#fffbeb]/50' : ''
+                }`}
+              >
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                  {/* To: Name */}
+                  <span className="font-bold text-[0.88rem] text-[#1a202c] w-36 truncate shrink-0">
+                    To: {recipientName}
+                  </span>
 
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-slate-500" />
-            <select
-              value={senderId}
-              onChange={(e) => {
-                setSenderId(e.target.value);
-                setPage(1);
-              }}
-              className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-            >
-              <option value="">All Senders</option>
-              {senders?.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.email})
-                </option>
-              ))}
-            </select>
-          </div>
+                  {/* Scheduled Orange Pill Badge */}
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#fef3c7] text-[#d97706] text-[0.74rem] font-bold shrink-0 border border-[#fde68a]">
+                    <Clock className="w-3 h-3 text-[#d97706]" />
+                    <span>{badgeText}</span>
+                  </span>
+
+                  {/* Subject & Preview snippet */}
+                  <div className="min-w-0 flex-1 flex items-center gap-1.5 text-[0.88rem] truncate">
+                    <span className="font-bold text-[#2d3748] truncate">
+                      {email.subject}
+                    </span>
+                    <span className="text-[#a0aec0] truncate font-normal">
+                      - {email.body.replace(/<[^>]+>/g, '')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Actions: Cancel & Star */}
+                <div className="flex items-center gap-3 shrink-0 ml-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCancel(email.id);
+                    }}
+                    disabled={cancelMutation.isPending}
+                    className="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 text-xs font-semibold p-1 transition-opacity"
+                    title="Cancel Email Job"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => togglePin(email.id, e)}
+                    className={`p-1 transition-colors ${
+                      isPinned ? 'text-[#f59e0b]' : 'text-[#cbd5e0] hover:text-[#f59e0b]'
+                    }`}
+                    title={isPinned ? 'Unpin Email' : 'Pin Email to Top'}
+                  >
+                    <Star className={`w-[18px] h-[18px] ${isPinned ? 'fill-[#f59e0b]' : ''}`} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      )}
 
-      {/* Table Container */}
-      <div className="glass-panel rounded-xl border border-slate-800 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900/90 uppercase text-[10px] text-slate-400 tracking-wider border-b border-slate-800">
-              <tr>
-                <th className="p-4">Recipient</th>
-                <th className="p-4">Subject</th>
-                <th className="p-4">Sender</th>
-                <th className="p-4">Scheduled For</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {isLoading ? (
-                <>
-                  <SkeletonRow cols={6} />
-                  <SkeletonRow cols={6} />
-                  <SkeletonRow cols={6} />
-                </>
-              ) : isError ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-rose-400">
-                    <AlertCircle className="w-6 h-6 mx-auto mb-2" />
-                    Failed to load scheduled emails.
-                  </td>
-                </tr>
-              ) : result?.data.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-12 text-center text-slate-400">
-                    <Clock className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                    <p className="font-medium">No scheduled emails found.</p>
-                    <p className="text-xs text-slate-500 mt-1">Schedule a new email from the Compose page.</p>
-                  </td>
-                </tr>
-              ) : (
-                result?.data.map((email) => (
-                  <tr key={email.id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="p-4 font-medium text-white">{email.toEmail}</td>
-                    <td className="p-4 text-slate-200 max-w-xs truncate">{email.subject}</td>
-                    <td className="p-4 text-slate-400">
-                      {email.sender ? `${email.sender.name} (${email.sender.email})` : 'Unknown'}
-                    </td>
-                    <td className="p-4 font-mono text-amber-400 font-medium">
-                      {new Date(email.scheduledAt).toLocaleString()}
-                    </td>
-                    <td className="p-4">
-                      <StatusBadge status={email.status} />
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          to={`/emails/${email.id}`}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                          title="Inspect Details"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </Link>
-                        <button
-                          onClick={() => handleCancel(email.id)}
-                          disabled={cancelMutation.isPending}
-                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
-                          title="Cancel Email Job"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {result && (
-          <Pagination
-            page={result.pagination.page}
-            totalPages={result.pagination.totalPages}
-            total={result.pagination.total}
-            limit={result.pagination.limit}
-            onPageChange={setPage}
-          />
-        )}
-      </div>
+      {result && (
+        <Pagination
+          page={result.pagination.page}
+          totalPages={result.pagination.totalPages}
+          total={result.pagination.total}
+          limit={result.pagination.limit}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   );
 };
