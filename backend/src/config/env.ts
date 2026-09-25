@@ -37,7 +37,12 @@ const envSchema = z.object({
   WORKER_CONCURRENCY: z.coerce.number().default(10),
   MIN_DELAY_BETWEEN_EMAILS_MS: z.coerce.number().default(2000),
   MAX_EMAILS_PER_HOUR_PER_SENDER: z.coerce.number().default(200),
-  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  CORS_ORIGIN: z.preprocess((val) => {
+    if (typeof val === 'string') {
+      return val.split(',').map((origin) => origin.trim()).filter(Boolean);
+    }
+    return val;
+  }, z.array(z.string()).default(['http://localhost:3000'])),
   JWT_SECRET: z.string().default('outboxlabs-local-dev-secret'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
