@@ -24,20 +24,20 @@ router.get('/failed', validateRequest({ query: listEmailQuerySchema }), EmailCon
 // List emails
 router.get('/', validateRequest({ query: listEmailQuerySchema }), EmailController.listEmails);
 
+
+// Temporary SMTP connectivity diagnostic
 router.get('/smtp-test', async (_req, res) => {
   const host = 'smtp.ethereal.email';
-  const port = 587;
   const startedAt = Date.now();
 
-  try {
-    const addresses = await dns.resolve4(host);
-
-    const result = await new Promise<{ connected: boolean; error?: string }>((resolve) => {
+  const testPort = (port: number) =>
+    new Promise<{ port: number; connected: boolean; error?: string }>((resolve) => {
       const socket = net.createConnection({ host, port });
 
       const timeout = setTimeout(() => {
         socket.destroy();
         resolve({
+          port,
           connected: false,
           error: 'TCP connection timeout',
         });
@@ -46,36 +46,44 @@ router.get('/smtp-test', async (_req, res) => {
       socket.on('connect', () => {
         clearTimeout(timeout);
         socket.destroy();
-        resolve({ connected: true });
+        resolve({ port, connected: true });
       });
 
       socket.on('error', (err) => {
         clearTimeout(timeout);
         resolve({
+          port,
           connected: false,
           error: err.message,
         });
       });
     });
 
+  try {
+    const addresses = await dns.resolve4(host);
+
+    const results = await Promise.all([
+      testPort(587),
+      testPort(465),
+    ]);
+
     res.json({
       host,
-      port,
       dnsResolved: true,
       addresses,
-      ...result,
+      ports: results,
       elapsedMs: Date.now() - startedAt,
     });
   } catch (err: any) {
     res.status(500).json({
       host,
-      port,
       dnsResolved: false,
       error: err?.message || 'DNS resolution failed',
       elapsedMs: Date.now() - startedAt,
     });
   }
 });
+
 // Email detail
 router.get('/:id', validateRequest({ params: emailIdParamSchema }), EmailController.getEmailById);
 
