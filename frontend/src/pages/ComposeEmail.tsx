@@ -147,6 +147,8 @@ export const ComposeEmail: React.FC = () => {
     queryFn: fetchSenders,
   });
 
+  const selectedSenderId = senderId || senders?.[0]?.id || '';
+
   const autoGenerateMutation = useMutation({
     mutationFn: autoGenerateSender,
     onSuccess: (data) => {
@@ -318,7 +320,7 @@ export const ComposeEmail: React.FC = () => {
 
   const submitEmail = (targetDate: Date) => {
     setErrorMessage(null);
-    if (!senderId) {
+    if (!selectedSenderId) {
       setErrorMessage('Please select a sender account.');
       return;
     }
@@ -351,7 +353,7 @@ export const ComposeEmail: React.FC = () => {
     });
 
     scheduleMutation.mutate({
-      senderId,
+      senderId: selectedSenderId,
       toEmail: finalRecipients.join(', '),
       subject,
       body: cleanHtml || '<p>No content</p>',
@@ -389,7 +391,7 @@ export const ComposeEmail: React.FC = () => {
     setLinkUrl('');
   };
 
-  const selectedSender = senders?.find((s) => s.id === senderId);
+  const selectedSender = senders?.find((s) => s.id === selectedSenderId);
   const senderDisplayEmail = selectedSender?.email || currentUser?.email || 'oliver.brown@domain.io';
 
   return (
@@ -464,7 +466,7 @@ export const ComposeEmail: React.FC = () => {
           <div className="relative inline-block">
             {senders && senders.length > 0 ? (
               <select
-                value={senderId}
+                value={selectedSenderId}
                 onChange={(e) => setSenderId(e.target.value)}
                 className="appearance-none bg-[#f4f6f5] hover:bg-[#edf2f0] text-[0.88rem] font-semibold text-[#2d3748] px-4 py-2 pr-9 rounded-xl border-none focus:outline-none cursor-pointer transition-colors"
               >
